@@ -1,0 +1,8 @@
+# HTTPS endpoints probed by the blackbox exporter. Ansible renders probes.yml from
+# platform_probe_targets; copy this file to probes.yml when running the stack by hand.
+- targets:
+    - https://status.example.com
+    - https://grafana.example.com/api/health
+    - https://s3nafps.github.io
+  labels:
+    group: public

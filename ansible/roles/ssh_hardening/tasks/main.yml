@@ -1,0 +1,45 @@
+---
+- name: Refuse to lock out the admin user
+  ansible.builtin.assert:
+    that:
+      - admin_ssh_public_keys | length > 0
+      - admin_ssh_public_keys | select('search', 'ExampleReplaceMe') | list | length == 0
+    fail_msg: Set admin_ssh_public_keys to your real key before disabling password and root login.
+
+- name: Install the hardened sshd drop-in
+  ansible.builtin.template:
+    src: 10-hardening.conf.j2
+    dest: /etc/ssh/sshd_config.d/10-hardening.conf
+    mode: "0644"
+  notify: Restart sshd
+
+# sshd -t needs its privilege separation directory, which socket-activated sshd
+# on Ubuntu 24.04 only creates when the first connection arrives.
+- name: Ensure the sshd privilege separation directory exists
+  ansible.builtin.file:
+    path: /run/sshd
+    state: directory
+    mode: "0755"
+
+- name: Validate the full sshd configuration
+  ansible.builtin.command: sshd -t
+  changed_when: false
+
+# Ubuntu 22.10+ starts sshd through ssh.socket, which ignores the Port setting.
+- name: Check for socket-activated sshd
+  ansible.builtin.stat:
+    path: /lib/systemd/system/ssh.socket
+  register: ssh_socket_unit
+
+- name: Switch from ssh.socket to ssh.service so the Port setting applies
+  ansible.builtin.systemd_service:
+    name: ssh.socket
+    enabled: false
+    state: stopped
+  when: ssh_socket_unit.stat.exists
+  notify: Restart sshd
+
+- name: Enable ssh.service
+  ansible.builtin.systemd_service:
+    name: ssh
+    enabled: true

@@ -1,0 +1,29 @@
+---
+base_packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - jq
+  - htop
+  - sqlite3
+  - rsync
+  - chrony
+  - unattended-upgrades
+  - apt-listchanges
+  - needrestart
+base_journald_max_use: 500M
+base_sysctl:
+  net.ipv4.tcp_syncookies: 1
+  net.ipv4.conf.all.rp_filter: 1
+  net.ipv4.conf.default.rp_filter: 1
+  net.ipv4.conf.all.accept_redirects: 0
+  net.ipv4.conf.default.accept_redirects: 0
+  net.ipv6.conf.all.accept_redirects: 0
+  net.ipv4.conf.all.send_redirects: 0
+  net.ipv4.conf.all.accept_source_route: 0
+  net.ipv4.conf.all.log_martians: 1
+  kernel.kptr_restrict: 2
+  kernel.dmesg_restrict: 1
+  fs.protected_hardlinks: 1
+  fs.protected_symlinks: 1
+  vm.swappiness: 10

@@ -1,0 +1,27 @@
+---
+# Bind-mounted config files do not change a service definition, so Compose would
+# not recreate the containers on its own. Apply the definition first, then reload
+# or restart the services that read those files.
+- name: Apply stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ platform_root }}"
+    state: present
+    recreate: auto
+    remove_orphans: true
+    wait: true
+    wait_timeout: 300
+  notify:
+    - Reload Caddy
+    - Restart config-driven services
+
+- name: Reload Caddy
+  ansible.builtin.command: docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
+  args:
+    chdir: "{{ platform_root }}"
+  changed_when: true
+
+- name: Restart config-driven services
+  ansible.builtin.command: docker compose restart prometheus alertmanager blackbox loki alloy grafana
+  args:
+    chdir: "{{ platform_root }}"
+  changed_when: true

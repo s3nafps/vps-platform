@@ -1,0 +1,7 @@
+profile: production
+exclude_paths:
+  - .github/
+  - stack/
+  - tests/
+skip_list:
+  - var-naming[no-role-prefix]   # shared variables (platform_*, admin_*) are intentionally used across roles

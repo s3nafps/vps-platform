@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Restore the latest snapshot into a scratch directory and prove it is usable:
+# the repository is consistent, the expected files exist, and every SQLite
+# database passes an integrity check. Writes a textfile metric on success.
+set -Eeuo pipefail
+
+CONFIG=${PLATFORM_BACKUP_CONFIG:-/etc/restic/platform-backup.conf}
+# shellcheck source=/dev/null
+source "$CONFIG"
+
+log() { printf '%s %s\n' "$(date -Is)" "$*"; }
+target=$(mktemp -d /var/tmp/platform-restore.XXXXXX)
+trap 'rm -rf "$target"' EXIT
+
+log "checking repository structure and 5% of the data"
+restic check --read-data-subset=5%
+
+log "restoring latest snapshot to ${target}"
+restic restore latest --tag platform --host "$(hostname)" --target "$target"
+
+required=("${PLATFORM_ROOT#/}/compose.yml" "${PLATFORM_ROOT#/}/.env")
+for file in "${required[@]}"; do
+  if [[ ! -s "${target}/${file}" ]]; then
+    log "FAILED: ${file} is missing or empty in the restore"
+    exit 1
+  fi
+done
+
+databases=0
+while IFS= read -r -d '' db; do
+  result=$(sqlite3 "$db" 'PRAGMA integrity_check;')
+  if [[ "$result" != "ok" ]]; then
+    log "FAILED: integrity check for ${db#"$target"}: ${result}"
+    exit 1
+  fi
+  databases=$((databases + 1))
+done < <(find "$target" -type f \( -name '*.db' -o -name '*.sqlite' \) -print0)
+
+log "restore verified: $(find "$target" -type f | wc -l) files, ${databases} SQLite database(s) intact"
+
+tmp=$(mktemp "${TEXTFILE_DIR}/.platform_restore.XXXXXX")
+{
+  echo "# HELP platform_restore_test_last_success_timestamp_seconds When the last successful restore test finished."
+  echo "# TYPE platform_restore_test_last_success_timestamp_seconds gauge"
+  echo "platform_restore_test_last_success_timestamp_seconds $(date +%s)"
+  echo "# HELP platform_restore_test_databases_verified SQLite databases that passed the integrity check."
+  echo "# TYPE platform_restore_test_databases_verified gauge"
+  echo "platform_restore_test_databases_verified ${databases}"
+} > "$tmp"
+chmod 0644 "$tmp"
+mv "$tmp" "${TEXTFILE_DIR}/platform_restore.prom"

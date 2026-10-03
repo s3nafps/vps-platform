@@ -1,0 +1,12 @@
+---
+# Copy to vault.yml and encrypt: ansible-vault encrypt group_vars/all/vault.yml
+vault_grafana_admin_password: "generate-with-openssl-rand-base64-24"
+vault_restic_repository: "s3:https://s3.eu-central-003.backblazeb2.com/my-bucket/vps01"
+vault_restic_password: "generate-with-openssl-rand-base64-32"
+vault_backup_environment:
+  AWS_ACCESS_KEY_ID: "b2-key-id"
+  AWS_SECRET_ACCESS_KEY: "b2-application-key"
+vault_telegram_bot_token: ""
+vault_telegram_chat_id: ""
+vault_smtp_username: ""
+vault_smtp_password: ""

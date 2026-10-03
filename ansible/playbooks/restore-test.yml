@@ -1,0 +1,19 @@
+---
+- name: Restore the latest snapshot to a scratch directory and verify it
+  hosts: platform
+  become: true
+  tasks:
+    # Starting a Type=oneshot unit blocks until it has finished.
+    - name: Run the restore test and wait for it to finish
+      ansible.builtin.systemd_service:
+        name: platform-restore-test.service
+        state: started
+
+    - name: Show the log of the last run
+      ansible.builtin.command: journalctl -u platform-restore-test.service -n 30 --no-pager -o cat
+      register: restore_log
+      changed_when: false
+
+    - name: Result
+      ansible.builtin.debug:
+        var: restore_log.stdout_lines

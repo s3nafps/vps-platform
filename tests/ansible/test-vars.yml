@@ -1,0 +1,9 @@
+# Values used when converging the roles inside a test container.
+platform_hostname: vps-test
+platform_swap_size_mb: 0
+admin_ssh_public_keys:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIM/aWn5IsIEwFxYqOSp/TJzhUN4RXkClls6QfA4/BEKK test@ci"
+backup_restic_repository: /var/backups/restic
+backup_restic_password: test-only-password
+backup_environment: {}
+vault_grafana_admin_password: test-only-password

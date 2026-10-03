@@ -1,0 +1,45 @@
+# Managed by Ansible (vps-platform stack role).
+{% set telegram = alert_telegram_bot_token | length > 0 and alert_telegram_chat_id | string | length > 0 %}
+{% set email = alert_email_to | length > 0 and alert_smtp_smarthost | length > 0 %}
+{% if email %}
+global:
+  smtp_smarthost: "{{ alert_smtp_smarthost }}"
+  smtp_from: "{{ alert_smtp_from }}"
+  smtp_auth_username: "{{ alert_smtp_username }}"
+  smtp_auth_password: "{{ alert_smtp_password }}"
+  smtp_require_tls: true
+
+{% endif %}
+route:
+  receiver: {{ 'default' if (telegram or email) else '"null"' }}
+  group_by: [alertname, severity]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers: [severity="critical"]
+      receiver: {{ 'default' if (telegram or email) else '"null"' }}
+      repeat_interval: 1h
+
+receivers:
+  - name: "null"
+{% if telegram or email %}
+  - name: default
+{% if telegram %}
+    telegram_configs:
+      - bot_token: "{{ alert_telegram_bot_token }}"
+        chat_id: {{ alert_telegram_chat_id }}
+        parse_mode: HTML
+        send_resolved: true
+{% endif %}
+{% if email %}
+    email_configs:
+      - to: "{{ alert_email_to }}"
+        send_resolved: true
+{% endif %}
+{% endif %}
+
+inhibit_rules:
+  - source_matchers: [severity="critical"]
+    target_matchers: [severity="warning"]
+    equal: [alertname, instance]

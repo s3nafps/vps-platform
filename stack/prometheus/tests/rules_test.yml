@@ -1,0 +1,88 @@
+# promtool test rules prometheus/tests/rules_test.yml
+rule_files:
+  - ../rules/host.yml
+  - ../rules/services.yml
+  - ../rules/backups.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: host down after two minutes
+    interval: 1m
+    input_series:
+      - series: 'up{job="node", instance="vps"}'
+        values: "1 0 0 0 0"
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: HostDown
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: HostDown
+        exp_alerts:
+          - exp_labels: { severity: critical, job: node, instance: vps }
+            exp_annotations:
+              summary: Node exporter on vps is not responding
+              description: Prometheus has not scraped node metrics for 2 minutes.
+
+  - name: disk space warning and critical thresholds
+    interval: 1m
+    input_series:
+      - series: 'node_filesystem_avail_bytes{instance="vps", mountpoint="/", fstype="ext4"}'
+        values: "10x10"
+      - series: 'node_filesystem_size_bytes{instance="vps", mountpoint="/", fstype="ext4"}'
+        values: "100x10"
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: HostDiskSpaceLow
+        exp_alerts:
+          - exp_labels: { severity: warning, instance: vps, mountpoint: /, fstype: ext4 }
+            exp_annotations:
+              summary: Disk / below 15% free on vps
+              description: 10.0% free.
+      - eval_time: 6m
+        alertname: HostDiskSpaceCritical
+        exp_alerts: []
+
+  - name: endpoint down
+    interval: 1m
+    input_series:
+      - series: 'probe_success{instance="https://status.example.com", job="blackbox"}'
+        values: "1 1 0 0 0 0"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: EndpointDown
+        exp_alerts:
+          - exp_labels: { severity: critical, instance: "https://status.example.com", job: blackbox }
+            exp_annotations:
+              summary: https://status.example.com is down
+              description: The blackbox probe has failed for 3 minutes.
+
+  - name: backup stale after 26 hours
+    interval: 1m
+    input_series:
+      # Last success stays at t=0 while time moves on.
+      - series: 'platform_backup_last_success_timestamp_seconds{instance="vps"}'
+        values: "0x1800"
+    alert_rule_test:
+      - eval_time: 25h
+        alertname: BackupStale
+        exp_alerts: []
+      - eval_time: 28h
+        alertname: BackupStale
+        exp_alerts:
+          - exp_labels: { severity: critical, instance: vps }
+            exp_annotations:
+              summary: The last successful backup is more than 26 hours old
+              description: "Last success 1d 4h 0m 0s ago. Check: journalctl -u platform-backup.service"
+
+  - name: backup metrics missing
+    interval: 1m
+    input_series: []
+    alert_rule_test:
+      - eval_time: 61m
+        alertname: BackupMetricsMissing
+        exp_alerts:
+          - exp_labels: { severity: warning }
+            exp_annotations:
+              summary: No backup metrics are being reported
+              description: The backup job writes a textfile metric after every run. Either it has never succeeded or node-exporter cannot read the textfile directory.

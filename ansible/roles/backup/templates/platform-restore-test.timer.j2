@@ -1,0 +1,10 @@
+[Unit]
+Description=Monthly platform restore test
+
+[Timer]
+OnCalendar={{ backup_restore_test_schedule }}
+RandomizedDelaySec=30m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

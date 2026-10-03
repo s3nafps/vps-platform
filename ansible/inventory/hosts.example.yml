@@ -1,0 +1,11 @@
+# Copy to hosts.yml. For the very first run against a fresh VPS, connect as root:
+#   ansible-playbook site.yml -e ansible_user=root -k
+# After that the admin user exists and root login over SSH is disabled.
+all:
+  children:
+    platform:
+      hosts:
+        vps01:
+          ansible_host: 203.0.113.10
+          ansible_user: deploy
+          ansible_port: 22

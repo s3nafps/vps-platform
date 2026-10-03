@@ -1,0 +1,11 @@
+[Unit]
+Description=Back up the platform with restic
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/restic/restic.env
+ExecStart=/usr/local/sbin/platform-backup
+Nice=10
+IOSchedulingClass=idle

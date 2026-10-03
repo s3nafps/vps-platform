@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily platform backup
+
+[Timer]
+OnCalendar={{ backup_schedule }}
+RandomizedDelaySec=15m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

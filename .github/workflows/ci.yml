@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install linters
+        run: pip install "ansible>=11" ansible-lint yamllint
+      - name: yamllint
+        run: yamllint -c .yamllint.yml .
+      - name: ansible-lint (production profile)
+        run: ansible-lint
+      - name: shellcheck
+        run: shellcheck tests/*.sh ansible/roles/backup/files/*
+
+  validate:
+    name: Validate service configs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: promtool, amtool, caddy, alloy, loki, compose
+        run: make validate
+
+  smoke:
+    name: Stack smoke test
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start the stack and run end-to-end checks
+        run: tests/smoke.sh
+
+  ansible:
+    name: Ansible converge, idempotence, verify
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Ansible
+        run: pip install "ansible>=11"
+      - name: Run the roles in a systemd container
+        run: tests/ansible.sh

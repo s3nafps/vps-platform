@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+# Back up the platform configuration and stateful Docker volumes with restic.
+#
+# Services that keep SQLite databases are stopped for the few seconds the copy
+# takes, so the snapshot is consistent. They are started again even if the
+# backup fails. Results are written as Prometheus textfile metrics so alerting
+# notices a missed or failed backup.
+set -Eeuo pipefail
+
+CONFIG=${PLATFORM_BACKUP_CONFIG:-/etc/restic/platform-backup.conf}
+# shellcheck source=/dev/null
+source "$CONFIG"
+
+started=$(date +%s)
+metrics_file="${TEXTFILE_DIR}/platform_backup.prom"
+stopped=""
+
+log() { printf '%s %s\n' "$(date -Is)" "$*"; }
+
+write_metrics() {
+  local exit_code=$1 last_success=${2:-} added=${3:-0} processed=${4:-0}
+  local tmp
+  tmp=$(mktemp "${TEXTFILE_DIR}/.platform_backup.XXXXXX")
+  {
+    echo "# HELP platform_backup_last_exit_code Exit code of the most recent backup run."
+    echo "# TYPE platform_backup_last_exit_code gauge"
+    echo "platform_backup_last_exit_code ${exit_code}"
+    echo "# HELP platform_backup_last_run_timestamp_seconds When the most recent backup run finished."
+    echo "# TYPE platform_backup_last_run_timestamp_seconds gauge"
+    echo "platform_backup_last_run_timestamp_seconds $(date +%s)"
+    echo "# HELP platform_backup_duration_seconds Duration of the most recent backup run."
+    echo "# TYPE platform_backup_duration_seconds gauge"
+    echo "platform_backup_duration_seconds $(($(date +%s) - started))"
+    if [[ -n "$last_success" ]]; then
+      echo "# HELP platform_backup_last_success_timestamp_seconds When the last successful backup finished."
+      echo "# TYPE platform_backup_last_success_timestamp_seconds gauge"
+      echo "platform_backup_last_success_timestamp_seconds ${last_success}"
+      echo "# HELP platform_backup_data_added_bytes New data added to the repository by the last successful backup."
+      echo "# TYPE platform_backup_data_added_bytes gauge"
+      echo "platform_backup_data_added_bytes ${added}"
+      echo "# HELP platform_backup_processed_bytes Data read by the last successful backup."
+      echo "# TYPE platform_backup_processed_bytes gauge"
+      echo "platform_backup_processed_bytes ${processed}"
+    fi
+  } > "$tmp"
+  chmod 0644 "$tmp"
+  mv "$tmp" "$metrics_file"
+}
+
+previous_success() {
+  if [[ -f "$metrics_file" ]]; then
+    awk '/^platform_backup_last_success_timestamp_seconds /{print $2}' "$metrics_file"
+  fi
+}
+
+ping_healthcheck() {
+  [[ -z "${HEALTHCHECK_URL:-}" ]] && return 0
+  curl -fsS -m 10 --retry 3 "${HEALTHCHECK_URL}${1:-}" > /dev/null || log "warning: healthcheck ping failed"
+}
+
+compose() { docker compose -p "$COMPOSE_PROJECT" --project-directory "$PLATFORM_ROOT" "$@"; }
+
+restart_services() {
+  if [[ -n "$stopped" ]]; then
+    log "starting ${stopped}"
+    # shellcheck disable=SC2086
+    compose start $stopped || log "warning: failed to start ${stopped}"
+    stopped=""
+  fi
+}
+
+on_error() {
+  local code=$?
+  restart_services
+  log "backup FAILED with exit code ${code}"
+  write_metrics "$code" "$(previous_success)"
+  ping_healthcheck /fail
+  exit "$code"
+}
+trap on_error ERR
+trap restart_services EXIT
+
+ping_healthcheck /start
+
+# Initialise the repository on first run only. Any other error (wrong password,
+# network, permissions) must fail the run instead of creating a new repository.
+if ! probe=$(restic cat config 2>&1 > /dev/null); then
+  if grep -qiE 'does not exist|no such file|is there a repository' <<< "$probe"; then
+    log "initialising restic repository"
+    restic init
+  else
+    log "cannot open the repository: ${probe}"
+    false
+  fi
+fi
+
+paths=("$PLATFORM_ROOT")
+for volume in $VOLUMES; do
+  mountpoint=$(docker volume inspect --format '{{ .Mountpoint }}' "${COMPOSE_PROJECT}_${volume}")
+  paths+=("$mountpoint")
+done
+# shellcheck disable=SC2206
+paths+=($EXTRA_PATHS)
+
+if [[ -n "$STOP_SERVICES" ]]; then
+  log "stopping ${STOP_SERVICES}"
+  # shellcheck disable=SC2086
+  compose stop $STOP_SERVICES
+  stopped="$STOP_SERVICES"
+fi
+
+log "backing up: ${paths[*]}"
+summary=$(restic backup --json --tag platform --host "$(hostname)" "${paths[@]}" | tail -n 1)
+
+restart_services
+
+added=$(jq -r '.data_added // 0' <<< "$summary")
+processed=$(jq -r '.total_bytes_processed // 0' <<< "$summary")
+snapshot=$(jq -r '.snapshot_id // "unknown"' <<< "$summary")
+log "snapshot ${snapshot}: processed ${processed} bytes, added ${added} bytes"
+
+log "applying retention (daily ${KEEP_DAILY}, weekly ${KEEP_WEEKLY}, monthly ${KEEP_MONTHLY})"
+restic forget --tag platform --host "$(hostname)" --prune \
+  --keep-daily "$KEEP_DAILY" --keep-weekly "$KEEP_WEEKLY" --keep-monthly "$KEEP_MONTHLY"
+
+write_metrics 0 "$(date +%s)" "$added" "$processed"
+ping_healthcheck
+log "backup finished in $(($(date +%s) - started))s"
