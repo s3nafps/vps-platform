@@ -1,0 +1,37 @@
+groups:
+  - name: backups
+    rules:
+      - alert: BackupMetricsMissing
+        expr: absent(platform_backup_last_success_timestamp_seconds)
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: No backup metrics are being reported
+          description: The backup job writes a textfile metric after every run. Either it has never succeeded or node-exporter cannot read the textfile directory.
+
+      - alert: BackupStale
+        expr: time() - platform_backup_last_success_timestamp_seconds > 26 * 3600
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: The last successful backup is more than 26 hours old
+          description: "Last success {{ $value | humanizeDuration }} ago. Check: journalctl -u platform-backup.service"
+
+      - alert: BackupFailed
+        expr: platform_backup_last_exit_code != 0
+        labels:
+          severity: critical
+        annotations:
+          summary: The most recent backup run failed
+          description: "Exit code {{ $value }}. Check: journalctl -u platform-backup.service"
+
+      - alert: RestoreTestStale
+        expr: time() - platform_restore_test_last_success_timestamp_seconds > 35 * 86400
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: No successful restore test in 35 days
+          description: A backup that has not been restored is a hope, not a backup. Check platform-restore-test.timer.

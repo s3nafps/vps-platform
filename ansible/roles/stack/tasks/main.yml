@@ -1,0 +1,50 @@
+---
+- name: Create the platform directory
+  ansible.builtin.file:
+    path: "{{ platform_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Copy the stack definition
+  ansible.posix.synchronize:
+    src: "{{ platform_stack_source }}"
+    dest: "{{ platform_root }}/"
+    delete: true
+    rsync_opts:
+      - "--exclude=.env"
+      - "--exclude=alertmanager/alertmanager.yml"
+      - "--exclude=prometheus/targets/probes.yml"
+      - "--exclude=*.example.yml"
+      - "--exclude=.env.example"
+  notify: Apply stack
+
+- name: Render environment, alerting and probe configuration
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ platform_root }}/{{ item.dest }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { src: env.j2, dest: .env, mode: "0600" }
+    - { src: alertmanager.yml.j2, dest: alertmanager/alertmanager.yml, mode: "0644" }
+    - { src: probes.yml.j2, dest: prometheus/targets/probes.yml, mode: "0644" }
+  loop_control:
+    label: "{{ item.dest }}"
+  notify: Apply stack
+
+- name: Validate the alerting configuration
+  ansible.builtin.command: >-
+    docker run --rm --entrypoint amtool
+    -v {{ platform_root }}/alertmanager:/cfg:ro
+    prom/alertmanager:v0.28.0 check-config /cfg/alertmanager.yml
+  changed_when: false
+
+- name: Start the stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ platform_root }}"
+    state: present
+    pull: missing
+    wait: true
+    wait_timeout: 300
+  register: stack_compose

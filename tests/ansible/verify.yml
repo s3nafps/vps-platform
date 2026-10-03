@@ -1,0 +1,89 @@
+---
+- name: Verify the converged host
+  hosts: platform
+  become: true
+  gather_facts: false
+  vars_files:
+    - ../../ansible/group_vars/all/main.yml
+    - test-vars.yml
+  tasks:
+    - name: Read the effective sshd configuration
+      ansible.builtin.command: sshd -T
+      register: verify_sshd
+      changed_when: false
+
+    - name: Assert SSH is hardened
+      ansible.builtin.assert:
+        that:
+          - "'permitrootlogin no' in verify_sshd.stdout_lines"
+          - "'passwordauthentication no' in verify_sshd.stdout_lines"
+          - "'allowusers deploy' in verify_sshd.stdout_lines"
+          - "'x11forwarding no' in verify_sshd.stdout_lines"
+
+    - name: Read the firewall status
+      ansible.builtin.command: ufw status verbose
+      register: verify_ufw
+      changed_when: false
+
+    - name: Assert the firewall denies by default and only opens SSH and web ports
+      ansible.builtin.assert:
+        that:
+          - "'Status: active' in verify_ufw.stdout"
+          - "'deny (incoming)' in verify_ufw.stdout"
+          - verify_ufw.stdout is search('22/tcp\\s+LIMIT IN')
+          - verify_ufw.stdout is search('443/tcp\\s+ALLOW IN')
+          - verify_ufw.stdout is not search('9100')
+
+    - name: Read fail2ban jails
+      ansible.builtin.command: fail2ban-client status
+      register: verify_f2b
+      changed_when: false
+
+    - name: Assert the sshd and recidive jails are active
+      ansible.builtin.assert:
+        that:
+          - verify_f2b.stdout is search('sshd')
+          - verify_f2b.stdout is search('recidive')
+
+    - name: Check Docker
+      ansible.builtin.command: docker version --format '{{ "{{" }}.Server.Version{{ "}}" }}'
+      register: verify_docker
+      changed_when: false
+
+    - name: Read the Docker daemon configuration
+      ansible.builtin.slurp:
+        src: /etc/docker/daemon.json
+      register: verify_daemon
+
+    - name: Assert Docker runs with log rotation and no-new-privileges
+      ansible.builtin.assert:
+        that:
+          - verify_docker.stdout | length > 0
+          - (verify_daemon.content | b64decode | from_json)['no-new-privileges']
+          - (verify_daemon.content | b64decode | from_json)['log-opts']['max-size'] == '10m'
+
+    - name: List timers
+      ansible.builtin.command: systemctl list-timers --all --no-pager
+      register: verify_timers
+      changed_when: false
+
+    - name: Assert the backup and restore-test timers are scheduled
+      ansible.builtin.assert:
+        that:
+          - verify_timers.stdout is search('platform-backup.timer')
+          - verify_timers.stdout is search('platform-restore-test.timer')
+
+    - name: Check that the backup credentials are private
+      ansible.builtin.stat:
+        path: /etc/restic/restic.env
+      register: verify_env
+
+    - name: Assert restic.env is readable by root only
+      ansible.builtin.assert:
+        that:
+          - verify_env.stat.mode == '0600'
+          - verify_env.stat.pw_name == 'root'
+
+    - name: Assert the admin user can sudo without a password
+      ansible.builtin.command: sudo -n -u deploy sudo -n true
+      changed_when: false

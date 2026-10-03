@@ -1,0 +1,3 @@
+---
+platform_root: /opt/platform
+platform_stack_source: "{{ playbook_dir }}/../stack/"

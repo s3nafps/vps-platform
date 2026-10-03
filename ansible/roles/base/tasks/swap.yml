@@ -1,0 +1,24 @@
+---
+- name: Create, format and enable the swap file
+  ansible.builtin.shell: |
+    set -e
+    fallocate -l {{ platform_swap_size_mb }}M /swapfile
+    chmod 0600 /swapfile
+    mkswap /swapfile
+    swapon /swapfile
+  args:
+    creates: /swapfile
+    executable: /bin/bash
+
+- name: Restrict swap file permissions
+  ansible.builtin.file:
+    path: /swapfile
+    mode: "0600"
+
+- name: Persist the swap file in fstab
+  ansible.posix.mount:
+    name: none
+    src: /swapfile
+    fstype: swap
+    opts: sw
+    state: present

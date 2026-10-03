@@ -1,0 +1,11 @@
+# Managed by Ansible (vps-platform backup role). Sourced by platform-backup.
+PLATFORM_ROOT="{{ platform_root }}"
+COMPOSE_PROJECT="platform"
+STOP_SERVICES="{{ backup_stop_services | join(' ') }}"
+VOLUMES="{{ backup_volumes | join(' ') }}"
+EXTRA_PATHS="{{ backup_paths_extra | join(' ') }}"
+KEEP_DAILY={{ backup_keep_daily }}
+KEEP_WEEKLY={{ backup_keep_weekly }}
+KEEP_MONTHLY={{ backup_keep_monthly }}
+TEXTFILE_DIR="{{ backup_textfile_dir }}"
+HEALTHCHECK_URL="{{ backup_healthcheck_url }}"

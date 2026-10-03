@@ -1,0 +1,57 @@
+---
+- name: Install restic
+  ansible.builtin.apt:
+    name: [restic, jq, sqlite3]
+    state: present
+
+- name: Create restic directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  loop: [/etc/restic, /var/cache/restic]
+
+- name: Write repository credentials and backup settings
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0600"
+  loop:
+    - { src: restic.env.j2, dest: /etc/restic/restic.env }
+    - { src: platform-backup.conf.j2, dest: /etc/restic/platform-backup.conf }
+  loop_control:
+    label: "{{ item.dest }}"
+  no_log: true
+
+- name: Install the backup and restore-test scripts
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/usr/local/sbin/{{ item }}"
+    mode: "0750"
+  loop: [platform-backup, platform-restore-test]
+
+- name: Install systemd units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    mode: "0644"
+  loop:
+    - platform-backup.service
+    - platform-backup.timer
+    - platform-restore-test.service
+    - platform-restore-test.timer
+  notify: Reload systemd
+
+- name: Flush handlers so systemd sees the new units
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable the timers
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop: [platform-backup.timer, platform-restore-test.timer]

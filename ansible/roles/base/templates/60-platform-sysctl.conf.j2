@@ -1,0 +1,6 @@
+# Managed by Ansible (vps-platform base role).
+# A leading "-" tells systemd-sysctl to skip keys the kernel does not have, for
+# example the IPv6 settings on a host with IPv6 disabled.
+{% for key, value in base_sysctl | dictsort %}
+-{{ key }} = {{ value }}
+{% endfor %}

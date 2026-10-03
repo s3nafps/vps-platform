@@ -1,0 +1,15 @@
+---
+- name: Converge the host roles
+  hosts: platform
+  become: true
+  vars_files:
+    - ../../ansible/group_vars/all/main.yml
+    - test-vars.yml
+  roles:
+    - base
+    - admin_user
+    - ssh_hardening
+    - firewall
+    - fail2ban
+    - docker
+    - backup

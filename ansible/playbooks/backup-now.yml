@@ -1,0 +1,19 @@
+---
+- name: Run a backup immediately and show the result
+  hosts: platform
+  become: true
+  tasks:
+    # Starting a Type=oneshot unit blocks until it has finished.
+    - name: Run the backup service and wait for it to finish
+      ansible.builtin.systemd_service:
+        name: platform-backup.service
+        state: started
+
+    - name: Read the backup metrics
+      ansible.builtin.slurp:
+        src: /var/lib/node_exporter/textfile/platform_backup.prom
+      register: backup_metrics
+
+    - name: Show them
+      ansible.builtin.debug:
+        msg: "{{ backup_metrics.content | b64decode | split('\n') | select('match', '^platform_') | list }}"

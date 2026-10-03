@@ -1,0 +1,11 @@
+---
+# A fresh VPS image already has sshd and a hostname tool; the container does not.
+- name: Prepare the test container
+  hosts: platform
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Install what a cloud image ships with
+      ansible.builtin.apt:
+        name: [openssh-server, iproute2, kmod, rsync]
+        update_cache: true

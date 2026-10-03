@@ -1,0 +1,16 @@
+# Minimal config that accepts alerts and sends them nowhere. Ansible renders the
+# real alertmanager.yml with Telegram and/or e-mail receivers from the vault.
+route:
+  receiver: "null"
+  group_by: [alertname, severity]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: "null"
+
+inhibit_rules:
+  - source_matchers: [severity="critical"]
+    target_matchers: [severity="warning"]
+    equal: [alertname, instance]

@@ -1,0 +1,13 @@
+---
+- name: Provision the platform VPS
+  hosts: platform
+  become: true
+  roles:
+    - { role: base, tags: [base] }
+    - { role: admin_user, tags: [admin_user] }
+    - { role: ssh_hardening, tags: [ssh] }
+    - { role: firewall, tags: [firewall] }
+    - { role: fail2ban, tags: [fail2ban] }
+    - { role: docker, tags: [docker] }
+    - { role: stack, tags: [stack] }
+    - { role: backup, tags: [backup] }

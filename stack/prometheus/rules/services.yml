@@ -1,0 +1,61 @@
+groups:
+  - name: services
+    rules:
+      - alert: TargetDown
+        expr: up{job!~"node|blackbox"} == 0
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.job }} metrics endpoint is down"
+          description: "Prometheus cannot scrape {{ $labels.instance }}."
+
+      - alert: ContainerMissing
+        expr: |
+          absent(container_last_seen{container_label_com_docker_compose_service="caddy"})
+          or absent(container_last_seen{container_label_com_docker_compose_service="uptime-kuma"})
+          or absent(container_last_seen{container_label_com_docker_compose_service="grafana"})
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: A core container is not running
+          description: Caddy, Uptime Kuma or Grafana has not been seen by cAdvisor for 3 minutes.
+
+      - alert: ContainerNearMemoryLimit
+        expr: |
+          container_memory_working_set_bytes{container_label_com_docker_compose_service!=""}
+            / (container_spec_memory_limit_bytes{container_label_com_docker_compose_service!=""} > 0) > 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.container_label_com_docker_compose_service }} is above 90% of its memory limit"
+          description: Raise mem_limit in compose.yml or investigate a leak before it is OOM-killed.
+
+      - alert: EndpointDown
+        expr: probe_success == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.instance }} is down"
+          description: The blackbox probe has failed for 3 minutes.
+
+      - alert: EndpointSlow
+        expr: probe_duration_seconds > 3
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.instance }} responds slowly"
+          description: "Probe takes {{ $value | printf \"%.1f\" }}s."
+
+      - alert: TlsCertificateExpiringSoon
+        expr: (probe_ssl_earliest_cert_expiry - time()) / 86400 < 14
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "TLS certificate for {{ $labels.instance }} expires in {{ $value | printf \"%.0f\" }} days"
+          description: Caddy renews automatically 30 days before expiry, so this usually means renewal is failing.

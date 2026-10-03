@@ -1,0 +1,11 @@
+[Unit]
+Description=Restore the latest platform backup to a scratch directory and verify it
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/restic/restic.env
+ExecStart=/usr/local/sbin/platform-restore-test
+Nice=10
+IOSchedulingClass=idle

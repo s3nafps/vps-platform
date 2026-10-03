@@ -1,0 +1,7 @@
+# Managed by Ansible (vps-platform stack role).
+- targets:
+{% for target in platform_probe_targets %}
+    - {{ target }}
+{% endfor %}
+  labels:
+    group: public

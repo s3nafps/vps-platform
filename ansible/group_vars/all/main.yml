@@ -1,0 +1,55 @@
+---
+# Everything a deployment needs to change lives in this file and in vault.yml.
+
+# --- Host ---------------------------------------------------------------------
+platform_hostname: vps01
+platform_timezone: Etc/UTC
+platform_swap_size_mb: 2048          # 0 disables the swap file
+platform_auto_reboot: true           # reboot for kernel updates
+platform_auto_reboot_time: "04:30"
+
+# --- Admin access ---------------------------------------------------------------
+admin_user: deploy
+admin_ssh_public_keys:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleReplaceMeWithYourOwnPublicKey me@laptop"
+ssh_port: 22
+
+# --- Stack ----------------------------------------------------------------------
+platform_root: /opt/platform
+platform_acme_email: you@example.com
+platform_status_domain: status.example.com
+platform_grafana_domain: grafana.example.com
+platform_grafana_admin_password: "{{ vault_grafana_admin_password }}"
+platform_prometheus_retention: 30d
+platform_prometheus_retention_size: 10GB
+
+# HTTPS endpoints probed every 30s; alerts fire when one is down or its
+# certificate is close to expiry.
+platform_probe_targets:
+  - "https://{{ platform_status_domain }}"
+  - "https://{{ platform_grafana_domain }}/api/health"
+  - https://s3nafps.github.io
+
+# --- Alerting -------------------------------------------------------------------
+# Leave a receiver's secrets empty to disable it. With none configured, alerts are
+# still visible in Grafana and Alertmanager but are not sent anywhere.
+alert_telegram_bot_token: "{{ vault_telegram_bot_token | default('') }}"
+alert_telegram_chat_id: "{{ vault_telegram_chat_id | default('') }}"
+alert_email_to: ""
+alert_smtp_smarthost: ""            # smtp.example.com:587
+alert_smtp_from: ""
+alert_smtp_username: "{{ vault_smtp_username | default('') }}"
+alert_smtp_password: "{{ vault_smtp_password | default('') }}"
+
+# --- Backups --------------------------------------------------------------------
+# Any restic backend works. Backblaze B2 through its S3 API is a cheap default:
+#   s3:https://s3.eu-central-003.backblazeb2.com/my-bucket/vps01
+backup_restic_repository: "{{ vault_restic_repository }}"
+backup_restic_password: "{{ vault_restic_password }}"
+backup_environment: "{{ vault_backup_environment | default({}) }}"  # e.g. AWS_ACCESS_KEY_ID
+backup_schedule: "*-*-* 03:30:00"
+backup_restore_test_schedule: "*-*-01 05:00:00"
+backup_keep_daily: 7
+backup_keep_weekly: 4
+backup_keep_monthly: 6
+backup_healthcheck_url: ""           # optional healthchecks.io ping URL

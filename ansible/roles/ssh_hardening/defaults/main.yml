@@ -1,0 +1,4 @@
+---
+ssh_port: 22
+ssh_allow_users: ["{{ admin_user }}"]
+ssh_allow_tcp_forwarding: local   # needed for tunnels to Prometheus and Alertmanager
