@@ -47,7 +47,7 @@ services:
 
   prometheus:
     <<: *defaults
-    image: prom/prometheus:v3.1.0
+    image: prom/prometheus:v3.15.0
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
@@ -73,7 +73,7 @@ services:
 
   alertmanager:
     <<: *defaults
-    image: prom/alertmanager:v0.28.0
+    image: prom/alertmanager:v0.34.1
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --storage.path=/alertmanager
@@ -92,7 +92,7 @@ services:
 
   node-exporter:
     <<: *defaults
-    image: prom/node-exporter:v1.8.2
+    image: prom/node-exporter:v1.12.1
     # Host network and PID namespace so network and process metrics describe the
     # VPS, not the container. Port 9100 is closed to the internet by the firewall.
     network_mode: host
@@ -128,7 +128,7 @@ services:
 
   blackbox:
     <<: *defaults
-    image: prom/blackbox-exporter:v0.25.0
+    image: prom/blackbox-exporter:v0.28.0
     command:
       - --config.file=/etc/blackbox/blackbox.yml
     volumes:
