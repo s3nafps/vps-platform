@@ -146,11 +146,14 @@ services:
       - loki-data:/loki
     networks: [monitoring]
     mem_limit: 512m
+    # 3.6+ images are distroless (no wget or shell). -health probes :3100/ready.
+    # The ingester reports ready only after a ~15s delay, so ignore that window.
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3100/ready"]
+      test: ["CMD", "/usr/bin/loki", "-health"]
       interval: 30s
       timeout: 5s
       retries: 5
+      start_period: 30s
 
   alloy:
     <<: *defaults
