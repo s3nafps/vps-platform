@@ -138,7 +138,7 @@ services:
 
   loki:
     <<: *defaults
-    image: grafana/loki:3.3.2
+    image: grafana/loki:3.7.9
     command:
       - -config.file=/etc/loki/loki.yml
     volumes:
@@ -154,7 +154,7 @@ services:
 
   alloy:
     <<: *defaults
-    image: grafana/alloy:v1.5.1
+    image: grafana/alloy:v1.21.1
     command:
       - run
       - --server.http.listen-addr=0.0.0.0:12345
@@ -175,7 +175,7 @@ services:
 
   grafana:
     <<: *defaults
-    image: grafana/grafana-oss:11.4.0
+    image: grafana/grafana-oss:13.0.2
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
