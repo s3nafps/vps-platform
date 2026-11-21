@@ -138,7 +138,7 @@ services:
 
   loki:
     <<: *defaults
-    image: grafana/loki:3.7.9
+    image: grafana/loki:3.7.10
     command:
       - -config.file=/etc/loki/loki.yml
     volumes:
@@ -157,7 +157,7 @@ services:
 
   alloy:
     <<: *defaults
-    image: grafana/alloy:v1.21.1
+    image: grafana/alloy:v1.22.0
     command:
       - run
       - --server.http.listen-addr=0.0.0.0:12345
